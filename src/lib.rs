@@ -1,9 +1,12 @@
+#![feature(allocator_api)]
+
 use std::collections::{VecDeque, LinkedList, HashMap, BTreeMap, HashSet, BTreeSet, BinaryHeap};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::io::{BufRead, Write};
 use std::error::Error;
 
 use lazy_static::*;
+use std::alloc::Global;
 
 lazy_static! {
     static ref TEST_BEFORE: AtomicBool = AtomicBool::new(false);
@@ -34,15 +37,15 @@ fn is_little_endian() -> bool {
 }
 
 trait Serialize {
-    fn serialize(&self, w: &mut dyn Write)-> Result<bool, Box<dyn Error>>;
+    fn serialize(&self, w: &mut dyn Write)-> Result<bool, Box<dyn Error, Global>>;
 }
 
 trait DeSerialize {
-    fn deserialize(&mut self, r: &mut dyn BufRead)-> Result<bool, Box<dyn Error>>;
+    fn deserialize(&mut self, r: &mut dyn BufRead)-> Result<bool, Box<dyn Error, Global>>;
 }
 
 impl Serialize for bool {
-    fn serialize(&self, w: &mut dyn Write)-> Result<bool, Box<dyn Error>> {
+    fn serialize(&self, w: &mut dyn Write)-> Result<bool, Box<dyn Error, Global>> {
         if *self {
             w.write_all(&[0x1u8])?;
         } else {
@@ -53,7 +56,7 @@ impl Serialize for bool {
 }
 
 impl DeSerialize for bool {
-    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<bool, Box<dyn Error>> {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<bool, Box<dyn Error, Global>> {
         let mut buffer = [0x0u8; 1];
         r.read(&mut buffer)?;
 
@@ -68,148 +71,115 @@ impl DeSerialize for bool {
     }
 }
 
-// impl Serialize for char {
-//     fn serialize() {
-//         unimplemented!()
-//     }
-// }
-//
-// impl Serialize for i8 {
-//     fn serialize() {
-//         unimplemented!()
-//     }
-// }
-//
-// impl Serialize for u8 {
-//     fn serialize() {
-//         unimplemented!()
-//     }
-// }
-//
+impl Serialize for char {
+    fn serialize(&self, w: &mut dyn Write) -> Result<bool, Box<dyn Error, Global>> {
+        w.write_all(&[self.clone() as u8])?;
+        Ok(true)
+    }
+}
+
+impl DeSerialize for char {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<bool, Box<dyn Error, Global>> {
+        let mut buffer = [0x0u8; 1];
+        r.read(&mut buffer)?;
+        *self = buffer[0] as char;
+        Ok(true)
+    }
+}
+
+impl Serialize for i8 {
+    fn serialize(&self, w: &mut dyn Write) -> Result<bool, Box<dyn Error, Global>> {
+        w.write_all(&[self.clone() as u8])?;
+        Ok(true)
+    }
+}
+
+impl DeSerialize for i8 {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<bool, Box<dyn Error, Global>> {
+        let mut buffer = [0x0u8; 1];
+        r.read(&mut buffer)?;
+        *self = buffer[0] as i8;
+        Ok(true)
+    }
+}
+
+impl Serialize for u8 {
+    fn serialize(&self, w: &mut dyn Write) -> Result<bool, Box<dyn Error, Global>> {
+        w.write_all(&[self.clone()])?;
+        Ok(true)
+    }
+}
+
+impl DeSerialize for u8 {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<bool, Box<dyn Error, Global>> {
+        let mut buffer = [0x0u8; 1];
+        r.read(&mut buffer)?;
+        *self = buffer[0];
+        Ok(true)
+    }
+}
+
 // impl Serialize for i16 {
-//     fn serialize() {
-//         unimplemented!()
-//     }
 // }
 //
 // impl Serialize for u16 {
-//     fn serialize() {
-//         unimplemented!()
-//     }
 // }
 //
 // impl Serialize for i32 {
-//     fn serialize() {
-//         unimplemented!()
-//     }
 // }
 //
 // impl Serialize for u32 {
-//     fn serialize() {
-//         unimplemented!()
-//     }
 // }
 //
 // impl Serialize for i64 {
-//     fn serialize() {
-//         unimplemented!()
-//     }
 // }
 //
 // impl Serialize for u64 {
-//     fn serialize() {
-//         unimplemented!()
-//     }
 // }
 //
 // impl Serialize for i128 {
-//     fn serialize() {
-//         unimplemented!()
-//     }
 // }
 //
 // impl Serialize for u128 {
-//     fn serialize() {
-//         unimplemented!()
-//     }
 // }
 //
 // impl Serialize for f32 {
-//     fn serialize() {
-//         unimplemented!()
-//     }
 // }
 //
 // impl Serialize for f64 {
-//     fn serialize() {
-//         unimplemented!()
-//     }
 // }
 //
 // impl Serialize for &str {
-//     fn serialize() {
-//         unimplemented!()
-//     }
 // }
 //
 // impl Serialize for String {
-//     fn serialize() {
-//         unimplemented!()
-//     }
 // }
 //
 // impl Serialize for &[T] {
-//     fn serialize() {
-//         unimplemented!()
-//     }
 // }
 //
 // impl Serialize for Vec<T> {
-//     fn serialize() {
-//         unimplemented!()
-//     }
 // }
 //
 // impl Serialize for VecDeque<T> {
-//     fn serialize() {
-//         unimplemented!()
-//     }
 // }
 //
 // impl Serialize for LinkedList<T> {
-//     fn serialize() {
-//         unimplemented!()
-//     }
 // }
 //
 // impl Serialize for HashMap<K,V> {
-//     fn serialize() {
-//         unimplemented!()
-//     }
 // }
 //
 // impl Serialize for BTreeMap<K,V> {
-//     fn serialize() {
-//         unimplemented!()
-//     }
 // }
 //
 // impl Serialize for HashSet<K> {
-//     fn serialize() {
-//         unimplemented!()
-//     }
 // }
 //
 // impl Serialize for BTreeSet<K> {
-//     fn serialize() {
-//         unimplemented!()
-//     }
 // }
 //
 // impl Serialize for BinaryHeap<T> {
-//     fn serialize() {
-//         unimplemented!()
-//     }
 // }
 
 #[cfg(test)]
@@ -235,7 +205,62 @@ mod tests {
     fn test_deserialize_bool() {
         let mut buf = Cursor::new(vec![0x01u8]);
         let mut val: bool = false;
-        let _ = val.deserialize(&mut buf);
+        let r = val.deserialize(&mut buf);
+        match r {
+            Err(e) => assert!(false, "{}", e.to_string()),
+            _ => {}
+        }
         assert_eq!(val, true);
+    }
+
+    #[test]
+    fn test_serialize_char() {
+        let mut buf = BufWriter::new(Vec::new());
+        assert_eq!(buf.buffer().len(), 0);
+        let _ = 'a'.serialize(&mut buf);
+        assert_eq!(buf.buffer().len(), 1);
+        assert_eq!(*(buf.buffer().get(0).unwrap()) as char, 'a');
+    }
+
+    #[test]
+    fn test_deserialize_char() {
+        let mut buf = Cursor::new(vec!['a' as u8]);
+        let mut val: char = 0x0 as char;
+        let _ = val.deserialize(&mut buf);
+        assert_eq!(val, 'a');
+    }
+
+    #[test]
+    fn test_serialize_i8() {
+        let mut buf = BufWriter::new(Vec::new());
+        assert_eq!(buf.buffer().len(), 0);
+        let _ = (-128i8).serialize(&mut buf);
+        assert_eq!(buf.buffer().len(), 1);
+        assert_eq!(*(buf.buffer().get(0).unwrap()) as i8, -128i8);
+    }
+
+    #[test]
+    fn test_deserialize_i8() {
+        let mut buf = Cursor::new(vec![(-128i8) as u8]);
+        let mut val: i8 = 0x0 as i8;
+        let _ = val.deserialize(&mut buf);
+        assert_eq!(val, -128i8);
+    }
+
+    #[test]
+    fn test_serialize_u8() {
+        let mut buf = BufWriter::new(Vec::new());
+        assert_eq!(buf.buffer().len(), 0);
+        let _ = (0xffu8).serialize(&mut buf);
+        assert_eq!(buf.buffer().len(), 1);
+        assert_eq!(*(buf.buffer().get(0).unwrap()), 0xffu8);
+    }
+
+    #[test]
+    fn test_deserialize_u8() {
+        let mut buf = Cursor::new(vec![0xffu8]);
+        let mut val: u8 = 0x0 as u8;
+        let _ = val.deserialize(&mut buf);
+        assert_eq!(val, 0xffu8);
     }
 }
