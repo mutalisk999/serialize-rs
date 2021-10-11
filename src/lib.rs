@@ -58,7 +58,7 @@ impl Serialize for bool {
 impl DeSerialize for bool {
     fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<bool, Box<dyn Error, Global>> {
         let mut buffer = [0x0u8; 1];
-        r.read(&mut buffer)?;
+        r.read_exact(&mut buffer)?;
 
         if buffer[0] == 0x0u8 {
             *self = false;
@@ -81,7 +81,7 @@ impl Serialize for char {
 impl DeSerialize for char {
     fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<bool, Box<dyn Error, Global>> {
         let mut buffer = [0x0u8; 1];
-        r.read(&mut buffer)?;
+        r.read_exact(&mut buffer)?;
         *self = buffer[0] as char;
         Ok(true)
     }
@@ -97,7 +97,7 @@ impl Serialize for i8 {
 impl DeSerialize for i8 {
     fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<bool, Box<dyn Error, Global>> {
         let mut buffer = [0x0u8; 1];
-        r.read(&mut buffer)?;
+        r.read_exact(&mut buffer)?;
         *self = buffer[0] as i8;
         Ok(true)
     }
@@ -113,24 +113,180 @@ impl Serialize for u8 {
 impl DeSerialize for u8 {
     fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<bool, Box<dyn Error, Global>> {
         let mut buffer = [0x0u8; 1];
-        r.read(&mut buffer)?;
+        r.read_exact(&mut buffer)?;
         *self = buffer[0];
         Ok(true)
     }
 }
 
-// impl Serialize for i16 {
-// }
-//
-// impl Serialize for u16 {
-// }
-//
-// impl Serialize for i32 {
-// }
-//
-// impl Serialize for u32 {
-// }
-//
+impl Serialize for i16 {
+    fn serialize(&self, w: &mut dyn Write) -> Result<bool, Box<dyn Error, Global>> {
+        unsafe {
+            union Value {
+                value_i16: i16,
+                value_u8s: [u8; 2],
+            }
+
+            let v = Value { value_i16 : self.clone() };
+            if is_little_endian() {
+                let mut r = v.value_u8s.clone();
+                r.reverse();
+                w.write_all(&r)?;
+            } else {
+                w.write_all(&v.value_u8s)?;
+            }
+        }
+        Ok(true)
+    }
+}
+
+impl DeSerialize for i16 {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<bool, Box<dyn Error, Global>> {
+        let mut buffer = [0x0u8; 2];
+        r.read_exact(&mut buffer)?;
+
+        unsafe {
+            union Value {
+                value_i16: i16,
+                value_u8s: [u8; 2],
+            }
+
+            if is_little_endian() {
+                buffer.reverse()
+            }
+            let v = Value { value_u8s : buffer };
+            *self = v.value_i16;
+        }
+        Ok(true)
+    }
+}
+
+impl Serialize for u16 {
+    fn serialize(&self, w: &mut dyn Write) -> Result<bool, Box<dyn Error, Global>> {
+        unsafe {
+            union Value {
+                value_u16: u16,
+                value_u8s: [u8; 2],
+            }
+
+            let v = Value { value_u16 : self.clone() };
+            if is_little_endian() {
+                let mut r = v.value_u8s.clone();
+                r.reverse();
+                w.write_all(&r)?;
+            } else {
+                w.write_all(&v.value_u8s)?;
+            }
+        }
+        Ok(true)
+    }
+}
+
+impl DeSerialize for u16 {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<bool, Box<dyn Error, Global>> {
+        let mut buffer = [0x0u8; 2];
+        r.read_exact(&mut buffer)?;
+
+        unsafe {
+            union Value {
+                value_u16: u16,
+                value_u8s: [u8; 2],
+            }
+
+            if is_little_endian() {
+                buffer.reverse()
+            }
+            let v = Value { value_u8s : buffer };
+            *self = v.value_u16;
+        }
+        Ok(true)
+    }
+}
+
+impl Serialize for i32 {
+    fn serialize(&self, w: &mut dyn Write) -> Result<bool, Box<dyn Error, Global>> {
+        unsafe {
+            union Value {
+                value_i32: i32,
+                value_u8s: [u8; 4],
+            }
+
+            let v = Value { value_i32 : self.clone() };
+            if is_little_endian() {
+                let mut r = v.value_u8s.clone();
+                r.reverse();
+                w.write_all(&r)?;
+            } else {
+                w.write_all(&v.value_u8s)?;
+            }
+        }
+        Ok(true)
+    }
+}
+
+impl DeSerialize for i32 {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<bool, Box<dyn Error, Global>> {
+        let mut buffer = [0x0u8; 4];
+        r.read_exact(&mut buffer)?;
+
+        unsafe {
+            union Value {
+                value_i32: i32,
+                value_u8s: [u8; 4],
+            }
+
+            if is_little_endian() {
+                buffer.reverse()
+            }
+            let v = Value { value_u8s : buffer };
+            *self = v.value_i32;
+        }
+        Ok(true)
+    }
+}
+
+impl Serialize for u32 {
+    fn serialize(&self, w: &mut dyn Write) -> Result<bool, Box<dyn Error, Global>> {
+        unsafe {
+            union Value {
+                value_u32: u32,
+                value_u8s: [u8; 4],
+            }
+
+            let v = Value { value_u32 : self.clone() };
+            if is_little_endian() {
+                let mut r = v.value_u8s.clone();
+                r.reverse();
+                w.write_all(&r)?;
+            } else {
+                w.write_all(&v.value_u8s)?;
+            }
+        }
+        Ok(true)
+    }
+}
+
+impl DeSerialize for u32 {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<bool, Box<dyn Error, Global>> {
+        let mut buffer = [0x0u8; 4];
+        r.read_exact(&mut buffer)?;
+
+        unsafe {
+            union Value {
+                value_u32: u32,
+                value_u8s: [u8; 4],
+            }
+
+            if is_little_endian() {
+                buffer.reverse()
+            }
+            let v = Value { value_u8s : buffer };
+            *self = v.value_u32;
+        }
+        Ok(true)
+    }
+}
+
 // impl Serialize for i64 {
 // }
 //
@@ -262,5 +418,83 @@ mod tests {
         let mut val: u8 = 0x0 as u8;
         let _ = val.deserialize(&mut buf);
         assert_eq!(val, 0xffu8);
+    }
+
+    #[test]
+    fn test_serialize_i16() {
+        let mut buf = BufWriter::new(Vec::new());
+        assert_eq!(buf.buffer().len(), 0);
+        let _ = (-0x010ai16).serialize(&mut buf);
+        assert_eq!(buf.buffer().len(), 2);
+        assert_eq!(*(buf.buffer().get(0).unwrap()) as u8, 0xfeu8);
+        assert_eq!(*(buf.buffer().get(1).unwrap()) as u8, 0xf6u8);
+    }
+
+    #[test]
+    fn test_deserialize_i16() {
+        let mut buf = Cursor::new(vec![(0xfe) as u8, (0xf6) as u8]);
+        let mut val: i16 = 0x0 as i16;
+        let _ = val.deserialize(&mut buf);
+        assert_eq!(val, -0x010ai16);
+    }
+
+    #[test]
+    fn test_serialize_u16() {
+        let mut buf = BufWriter::new(Vec::new());
+        assert_eq!(buf.buffer().len(), 0);
+        let _ = (0x0102u16).serialize(&mut buf);
+        assert_eq!(buf.buffer().len(), 2);
+        assert_eq!(*(buf.buffer().get(0).unwrap()) as u8, 0x01u8);
+        assert_eq!(*(buf.buffer().get(1).unwrap()) as u8, 0x02u8);
+    }
+
+    #[test]
+    fn test_deserialize_u16() {
+        let mut buf = Cursor::new(vec![(0x01) as u8, (0x02) as u8]);
+        let mut val: u16 = 0x0 as u16;
+        let _ = val.deserialize(&mut buf);
+        assert_eq!(val, 0x0102u16);
+    }
+
+    #[test]
+    fn test_serialize_i32() {
+        let mut buf = BufWriter::new(Vec::new());
+        assert_eq!(buf.buffer().len(), 0);
+        let _ = (-0x01020304i32).serialize(&mut buf);
+        assert_eq!(buf.buffer().len(), 4);
+        assert_eq!(*(buf.buffer().get(0).unwrap()) as u8, 0xfeu8);
+        assert_eq!(*(buf.buffer().get(1).unwrap()) as u8, 0xfdu8);
+        assert_eq!(*(buf.buffer().get(2).unwrap()) as u8, 0xfcu8);
+        assert_eq!(*(buf.buffer().get(3).unwrap()) as u8, 0xfcu8);
+    }
+
+    #[test]
+    fn test_deserialize_i32() {
+        let mut buf = Cursor::new(vec![(0xfe) as u8, (0xfd) as u8,
+                                       (0xfc) as u8, (0xfc) as u8]);
+        let mut val: i32 = 0x0 as i32;
+        let _ = val.deserialize(&mut buf);
+        assert_eq!(val, -0x01020304i32);
+    }
+
+    #[test]
+    fn test_serialize_u32() {
+        let mut buf = BufWriter::new(Vec::new());
+        assert_eq!(buf.buffer().len(), 0);
+        let _ = (0x01020304u32).serialize(&mut buf);
+        assert_eq!(buf.buffer().len(), 4);
+        assert_eq!(*(buf.buffer().get(0).unwrap()) as u8, 0x01u8);
+        assert_eq!(*(buf.buffer().get(1).unwrap()) as u8, 0x02u8);
+        assert_eq!(*(buf.buffer().get(2).unwrap()) as u8, 0x03u8);
+        assert_eq!(*(buf.buffer().get(3).unwrap()) as u8, 0x04u8);
+    }
+
+    #[test]
+    fn test_deserialize_u32() {
+        let mut buf = Cursor::new(vec![(0x01) as u8, (0x02) as u8,
+                                       (0x03) as u8, (0x04) as u8]);
+        let mut val: u32 = 0x0 as u32;
+        let _ = val.deserialize(&mut buf);
+        assert_eq!(val, 0x01020304u32);
     }
 }
