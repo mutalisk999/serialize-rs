@@ -152,7 +152,7 @@ impl DeSerialize for i16 {
             }
 
             if is_little_endian() {
-                buffer.reverse()
+                buffer.reverse();
             }
             let v = Value { value_u8s : buffer };
             *self = v.value_i16;
@@ -194,7 +194,7 @@ impl DeSerialize for u16 {
             }
 
             if is_little_endian() {
-                buffer.reverse()
+                buffer.reverse();
             }
             let v = Value { value_u8s : buffer };
             *self = v.value_u16;
@@ -236,7 +236,7 @@ impl DeSerialize for i32 {
             }
 
             if is_little_endian() {
-                buffer.reverse()
+                buffer.reverse();
             }
             let v = Value { value_u8s : buffer };
             *self = v.value_i32;
@@ -278,7 +278,7 @@ impl DeSerialize for u32 {
             }
 
             if is_little_endian() {
-                buffer.reverse()
+                buffer.reverse();
             }
             let v = Value { value_u8s : buffer };
             *self = v.value_u32;
@@ -287,18 +287,174 @@ impl DeSerialize for u32 {
     }
 }
 
-// impl Serialize for i64 {
-// }
-//
-// impl Serialize for u64 {
-// }
-//
-// impl Serialize for i128 {
-// }
-//
-// impl Serialize for u128 {
-// }
-//
+impl Serialize for i64 {
+    fn serialize(&self, w: &mut dyn Write) -> Result<bool, Box<dyn Error, Global>> {
+        unsafe {
+            union Value {
+                value_i64: i64,
+                value_u8s: [u8; 8],
+            }
+
+            let v = Value { value_i64 : self.clone() };
+            if is_little_endian() {
+                let mut r = v.value_u8s.clone();
+                r.reverse();
+                w.write_all(&r)?;
+            } else {
+                w.write_all(&v.value_u8s)?;
+            }
+        }
+        Ok(true)
+    }
+}
+
+impl DeSerialize for i64 {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<bool, Box<dyn Error, Global>> {
+        let mut buffer = [0x0u8; 8];
+        r.read_exact(&mut buffer)?;
+
+        unsafe {
+            union Value {
+                value_i64: i64,
+                value_u8s: [u8; 8],
+            }
+
+            if is_little_endian() {
+                buffer.reverse();
+            }
+            let v = Value { value_u8s : buffer };
+            *self = v.value_i64;
+        }
+        Ok(true)
+    }
+}
+
+impl Serialize for u64 {
+    fn serialize(&self, w: &mut dyn Write) -> Result<bool, Box<dyn Error, Global>> {
+        unsafe {
+            union Value {
+                value_u64: u64,
+                value_u8s: [u8; 8],
+            }
+
+            let v = Value { value_u64 : self.clone() };
+            if is_little_endian() {
+                let mut r = v.value_u8s.clone();
+                r.reverse();
+                w.write_all(&r)?;
+            } else {
+                w.write_all(&v.value_u8s)?;
+            }
+        }
+        Ok(true)
+    }
+}
+
+impl DeSerialize for u64 {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<bool, Box<dyn Error, Global>> {
+        let mut buffer = [0x0u8; 8];
+        r.read_exact(&mut buffer)?;
+
+        unsafe {
+            union Value {
+                value_u64: u64,
+                value_u8s: [u8; 8],
+            }
+
+            if is_little_endian() {
+                buffer.reverse();
+            }
+            let v = Value { value_u8s : buffer };
+            *self = v.value_u64;
+        }
+        Ok(true)
+    }
+}
+
+impl Serialize for i128 {
+    fn serialize(&self, w: &mut dyn Write) -> Result<bool, Box<dyn Error, Global>> {
+        unsafe {
+            union Value {
+                value_i128: i128,
+                value_u8s: [u8; 16],
+            }
+
+            let v = Value { value_i128 : self.clone() };
+            if is_little_endian() {
+                let mut r = v.value_u8s.clone();
+                r.reverse();
+                w.write_all(&r)?;
+            } else {
+                w.write_all(&v.value_u8s)?;
+            }
+        }
+        Ok(true)
+    }
+}
+
+impl DeSerialize for i128 {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<bool, Box<dyn Error, Global>> {
+        let mut buffer = [0x0u8; 16];
+        r.read_exact(&mut buffer)?;
+
+        unsafe {
+            union Value {
+                value_i128: i128,
+                value_u8s: [u8; 16],
+            }
+
+            if is_little_endian() {
+                buffer.reverse();
+            }
+            let v = Value { value_u8s : buffer };
+            *self = v.value_i128;
+        }
+        Ok(true)
+    }
+}
+
+impl Serialize for u128 {
+    fn serialize(&self, w: &mut dyn Write) -> Result<bool, Box<dyn Error, Global>> {
+        unsafe {
+            union Value {
+                value_u128: u128,
+                value_u8s: [u8; 16],
+            }
+
+            let v = Value { value_u128 : self.clone() };
+            if is_little_endian() {
+                let mut r = v.value_u8s.clone();
+                r.reverse();
+                w.write_all(&r)?;
+            } else {
+                w.write_all(&v.value_u8s)?;
+            }
+        }
+        Ok(true)
+    }
+}
+
+impl DeSerialize for u128 {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<bool, Box<dyn Error, Global>> {
+        let mut buffer = [0x0u8; 16];
+        r.read_exact(&mut buffer)?;
+
+        unsafe {
+            union Value {
+                value_u128: u128,
+                value_u8s: [u8; 16],
+            }
+
+            if is_little_endian() {
+                buffer.reverse();
+            }
+            let v = Value { value_u8s : buffer };
+            *self = v.value_u128;
+        }
+        Ok(true)
+    }
+}
+
 // impl Serialize for f32 {
 // }
 //
@@ -496,5 +652,137 @@ mod tests {
         let mut val: u32 = 0x0 as u32;
         let _ = val.deserialize(&mut buf);
         assert_eq!(val, 0x01020304u32);
+    }
+
+    #[test]
+    fn test_serialize_i64() {
+        let mut buf = BufWriter::new(Vec::new());
+        assert_eq!(buf.buffer().len(), 0);
+        let _ = (-0x0102030405060708i64).serialize(&mut buf);
+        assert_eq!(buf.buffer().len(), 8);
+        assert_eq!(*(buf.buffer().get(0).unwrap()) as u8, 0xfeu8);
+        assert_eq!(*(buf.buffer().get(1).unwrap()) as u8, 0xfdu8);
+        assert_eq!(*(buf.buffer().get(2).unwrap()) as u8, 0xfcu8);
+        assert_eq!(*(buf.buffer().get(3).unwrap()) as u8, 0xfbu8);
+        assert_eq!(*(buf.buffer().get(4).unwrap()) as u8, 0xfau8);
+        assert_eq!(*(buf.buffer().get(5).unwrap()) as u8, 0xf9u8);
+        assert_eq!(*(buf.buffer().get(6).unwrap()) as u8, 0xf8u8);
+        assert_eq!(*(buf.buffer().get(7).unwrap()) as u8, 0xf8u8);
+    }
+
+    #[test]
+    fn test_deserialize_i64() {
+        let mut buf = Cursor::new(vec![(0xfe) as u8, (0xfd) as u8,
+                                       (0xfc) as u8, (0xfb) as u8,
+                                       (0xfa) as u8, (0xf9) as u8,
+                                       (0xf8) as u8, (0xf8) as u8]);
+        let mut val: i64 = 0x0 as i64;
+        let _ = val.deserialize(&mut buf);
+        assert_eq!(val, -0x0102030405060708i64);
+    }
+
+    #[test]
+    fn test_serialize_u64() {
+        let mut buf = BufWriter::new(Vec::new());
+        assert_eq!(buf.buffer().len(), 0);
+        let _ = (0x0102030405060708u64).serialize(&mut buf);
+        assert_eq!(buf.buffer().len(), 8);
+        assert_eq!(*(buf.buffer().get(0).unwrap()) as u8, 0x01u8);
+        assert_eq!(*(buf.buffer().get(1).unwrap()) as u8, 0x02u8);
+        assert_eq!(*(buf.buffer().get(2).unwrap()) as u8, 0x03u8);
+        assert_eq!(*(buf.buffer().get(3).unwrap()) as u8, 0x04u8);
+        assert_eq!(*(buf.buffer().get(4).unwrap()) as u8, 0x05u8);
+        assert_eq!(*(buf.buffer().get(5).unwrap()) as u8, 0x06u8);
+        assert_eq!(*(buf.buffer().get(6).unwrap()) as u8, 0x07u8);
+        assert_eq!(*(buf.buffer().get(7).unwrap()) as u8, 0x08u8);
+    }
+
+    #[test]
+    fn test_deserialize_u64() {
+        let mut buf = Cursor::new(vec![(0x01) as u8, (0x02) as u8,
+                                       (0x03) as u8, (0x04) as u8,
+                                       (0x05) as u8, (0x06) as u8,
+                                       (0x07) as u8, (0x08) as u8]);
+        let mut val: u64 = 0x0 as u64;
+        let _ = val.deserialize(&mut buf);
+        assert_eq!(val, 0x0102030405060708u64);
+    }
+
+    #[test]
+    fn test_serialize_i128() {
+        let mut buf = BufWriter::new(Vec::new());
+        assert_eq!(buf.buffer().len(), 0);
+        let _ = (-0x01020304050607080102030405060708i128).serialize(&mut buf);
+        assert_eq!(buf.buffer().len(), 16);
+        assert_eq!(*(buf.buffer().get(0).unwrap()) as u8, 0xfeu8);
+        assert_eq!(*(buf.buffer().get(1).unwrap()) as u8, 0xfdu8);
+        assert_eq!(*(buf.buffer().get(2).unwrap()) as u8, 0xfcu8);
+        assert_eq!(*(buf.buffer().get(3).unwrap()) as u8, 0xfbu8);
+        assert_eq!(*(buf.buffer().get(4).unwrap()) as u8, 0xfau8);
+        assert_eq!(*(buf.buffer().get(5).unwrap()) as u8, 0xf9u8);
+        assert_eq!(*(buf.buffer().get(6).unwrap()) as u8, 0xf8u8);
+        assert_eq!(*(buf.buffer().get(7).unwrap()) as u8, 0xf7u8);
+        assert_eq!(*(buf.buffer().get(8).unwrap()) as u8, 0xfeu8);
+        assert_eq!(*(buf.buffer().get(9).unwrap()) as u8, 0xfdu8);
+        assert_eq!(*(buf.buffer().get(10).unwrap()) as u8, 0xfcu8);
+        assert_eq!(*(buf.buffer().get(11).unwrap()) as u8, 0xfbu8);
+        assert_eq!(*(buf.buffer().get(12).unwrap()) as u8, 0xfau8);
+        assert_eq!(*(buf.buffer().get(13).unwrap()) as u8, 0xf9u8);
+        assert_eq!(*(buf.buffer().get(14).unwrap()) as u8, 0xf8u8);
+        assert_eq!(*(buf.buffer().get(15).unwrap()) as u8, 0xf8u8);
+    }
+
+    #[test]
+    fn test_deserialize_i128() {
+        let mut buf = Cursor::new(vec![(0xfe) as u8, (0xfd) as u8,
+                                       (0xfc) as u8, (0xfb) as u8,
+                                       (0xfa) as u8, (0xf9) as u8,
+                                       (0xf8) as u8, (0xf7) as u8,
+                                       (0xfe) as u8, (0xfd) as u8,
+                                       (0xfc) as u8, (0xfb) as u8,
+                                       (0xfa) as u8, (0xf9) as u8,
+                                       (0xf8) as u8, (0xf8) as u8]);
+        let mut val: i128 = 0x0 as i128;
+        let _ = val.deserialize(&mut buf);
+        assert_eq!(val, -0x01020304050607080102030405060708i128);
+    }
+
+    #[test]
+    fn test_serialize_u128() {
+        let mut buf = BufWriter::new(Vec::new());
+        assert_eq!(buf.buffer().len(), 0);
+        let _ = (0x01020304050607080102030405060708u128).serialize(&mut buf);
+        assert_eq!(buf.buffer().len(), 16);
+        assert_eq!(*(buf.buffer().get(0).unwrap()) as u8, 0x01u8);
+        assert_eq!(*(buf.buffer().get(1).unwrap()) as u8, 0x02u8);
+        assert_eq!(*(buf.buffer().get(2).unwrap()) as u8, 0x03u8);
+        assert_eq!(*(buf.buffer().get(3).unwrap()) as u8, 0x04u8);
+        assert_eq!(*(buf.buffer().get(4).unwrap()) as u8, 0x05u8);
+        assert_eq!(*(buf.buffer().get(5).unwrap()) as u8, 0x06u8);
+        assert_eq!(*(buf.buffer().get(6).unwrap()) as u8, 0x07u8);
+        assert_eq!(*(buf.buffer().get(7).unwrap()) as u8, 0x08u8);
+        assert_eq!(*(buf.buffer().get(8).unwrap()) as u8, 0x01u8);
+        assert_eq!(*(buf.buffer().get(9).unwrap()) as u8, 0x02u8);
+        assert_eq!(*(buf.buffer().get(10).unwrap()) as u8, 0x03u8);
+        assert_eq!(*(buf.buffer().get(11).unwrap()) as u8, 0x04u8);
+        assert_eq!(*(buf.buffer().get(12).unwrap()) as u8, 0x05u8);
+        assert_eq!(*(buf.buffer().get(13).unwrap()) as u8, 0x06u8);
+        assert_eq!(*(buf.buffer().get(14).unwrap()) as u8, 0x07u8);
+        assert_eq!(*(buf.buffer().get(15).unwrap()) as u8, 0x08u8);
+    }
+
+    #[test]
+    fn test_deserialize_u128() {
+        let mut buf = Cursor::new(vec![(0x01) as u8, (0x02) as u8,
+                                       (0x03) as u8, (0x04) as u8,
+                                       (0x05) as u8, (0x06) as u8,
+                                       (0x07) as u8, (0x08) as u8,
+                                       (0x01) as u8, (0x02) as u8,
+                                       (0x03) as u8, (0x04) as u8,
+                                       (0x05) as u8, (0x06) as u8,
+                                       (0x07) as u8, (0x08) as u8]);
+        let mut val: u128 = 0x0 as u128;
+        let _ = val.deserialize(&mut buf);
+        assert_eq!(val, 0x01020304050607080102030405060708u128);
     }
 }
