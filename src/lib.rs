@@ -641,6 +641,8 @@ impl<T: DeSerialize> DeSerialize for Option<T> {
 mod tests {
     use crate::{is_little_endian, Serialize, DeSerialize};
     use std::io::{BufWriter, Cursor};
+    use std::error::Error;
+    use std::alloc::Global;
 
     #[test]
     fn test_is_little_endian() {
@@ -1030,5 +1032,20 @@ mod tests {
         let mut val: Option<String> = Some(String::new());
         let _ = val.deserialize(&mut buf);
         assert_eq!(val, None);
+
+        // error: try to deserialize to None type
+        let o: Option<String> = Some(String::from("abcd"));
+        let mut buf = BufWriter::new(Vec::new());
+        let _ = o.serialize(&mut buf);
+
+        let mut buf = Cursor::new(buf.buffer());
+        let mut val: Option<String> = None;
+        let r = val.deserialize(&mut buf);
+        match r {
+            Err(e) => {
+                assert_eq!(e.to_string(), String::from("can not deserialize to None type"));
+            },
+            _ => {}
+        }
     }
 }
