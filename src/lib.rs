@@ -7,6 +7,7 @@ use std::error::Error;
 
 use lazy_static::*;
 use std::alloc::Global;
+use std::ops::Index;
 
 lazy_static! {
     static ref TEST_BEFORE: AtomicBool = AtomicBool::new(false);
@@ -455,19 +456,88 @@ impl DeSerialize for u128 {
     }
 }
 
-// impl Serialize for f32 {
-// }
-//
-// impl Serialize for f64 {
-// }
-//
-// impl Serialize for &str {
-// }
-//
+impl Serialize for f32 {
+    fn serialize(&self, w: &mut dyn Write) -> Result<bool, Box<dyn Error, Global>> {
+        unsafe {
+            union Value {
+                value_f32: f32,
+                value_u8s: [u8; 4],
+            }
+
+            let v = Value { value_f32 : self.clone() };
+            w.write_all(&v.value_u8s)?;
+        }
+        Ok(true)
+    }
+}
+
+impl DeSerialize for f32 {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<bool, Box<dyn Error, Global>> {
+        let mut buffer = [0x0u8; 4];
+        r.read_exact(&mut buffer)?;
+
+        unsafe {
+            union Value {
+                value_f32: f32,
+                value_u8s: [u8; 4],
+            }
+
+            let v = Value { value_u8s : buffer };
+            *self = v.value_f32;
+        }
+        Ok(true)
+    }
+}
+
+impl Serialize for f64 {
+    fn serialize(&self, w: &mut dyn Write) -> Result<bool, Box<dyn Error, Global>> {
+        unsafe {
+            union Value {
+                value_f64: f64,
+                value_u8s: [u8; 8],
+            }
+
+            let v = Value { value_f64 : self.clone() };
+            w.write_all(&v.value_u8s)?;
+        }
+        Ok(true)
+    }
+}
+
+impl DeSerialize for f64 {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<bool, Box<dyn Error, Global>> {
+        let mut buffer = [0x0u8; 8];
+        r.read_exact(&mut buffer)?;
+
+        unsafe {
+            union Value {
+                value_f64: f64,
+                value_u8s: [u8; 8],
+            }
+
+            let v = Value { value_u8s : buffer };
+            *self = v.value_f64;
+        }
+        Ok(true)
+    }
+}
+
+impl Serialize for str {
+    fn serialize(&self, w: &mut dyn Write) -> Result<bool, Box<dyn Error, Global>> {
+        let length = self.len() as u32;
+        length.serialize(w)?;
+
+        for c in self.chars() {
+            c.serialize(w)?;
+        }
+        Ok(true)
+    }
+}
+
 // impl Serialize for String {
 // }
 //
-// impl Serialize for &[T] {
+// impl Serialize for [T] {
 // }
 //
 // impl Serialize for Vec<T> {
@@ -784,5 +854,43 @@ mod tests {
         let mut val: u128 = 0x0 as u128;
         let _ = val.deserialize(&mut buf);
         assert_eq!(val, 0x01020304050607080102030405060708u128);
+    }
+
+    #[test]
+    fn test_serialize_deserialize_f32() {
+        let mut buf = BufWriter::new(Vec::new());
+        assert_eq!(buf.buffer().len(), 0);
+        let _ = (0.12345 as f32).serialize(&mut buf);
+        assert_eq!(buf.buffer().len(), 4);
+
+        let mut buf = Cursor::new(buf.buffer());
+        let mut val: f32 = 0.0 as f32;
+        let _ = val.deserialize(&mut buf);
+        assert_eq!(val, 0.12345f32);
+    }
+
+    #[test]
+    fn test_serialize_deserialize_f64() {
+        let mut buf = BufWriter::new(Vec::new());
+        assert_eq!(buf.buffer().len(), 0);
+        let _ = (0.123456789012345 as f64).serialize(&mut buf);
+        assert_eq!(buf.buffer().len(), 8);
+
+        let mut buf = Cursor::new(buf.buffer());
+        let mut val: f64 = 0.0 as f64;
+        let _ = val.deserialize(&mut buf);
+        assert_eq!(val, 0.123456789012345f64);
+    }
+
+    #[test]
+    fn test_serialize_str() {
+        let mut buf = BufWriter::new(Vec::new());
+        assert_eq!(buf.buffer().len(), 0);
+        let _ = ("abcd" as &'static str).serialize(&mut buf);
+        assert_eq!(buf.buffer().len(), 8);
+        assert_eq!(*(buf.buffer().get(4).unwrap()) as char, 'a');
+        assert_eq!(*(buf.buffer().get(5).unwrap()) as char, 'b');
+        assert_eq!(*(buf.buffer().get(6).unwrap()) as char, 'c');
+        assert_eq!(*(buf.buffer().get(7).unwrap()) as char, 'd');
     }
 }
