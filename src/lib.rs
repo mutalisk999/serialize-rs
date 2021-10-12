@@ -7,7 +7,6 @@ use std::error::Error;
 
 use lazy_static::*;
 use std::alloc::Global;
-use std::ops::Index;
 
 lazy_static! {
     static ref TEST_BEFORE: AtomicBool = AtomicBool::new(false);
@@ -534,12 +533,86 @@ impl Serialize for str {
     }
 }
 
-// impl Serialize for String {
-// }
-//
-// impl Serialize for [T] {
-// }
-//
+impl Serialize for String {
+    fn serialize(&self, w: &mut dyn Write) -> Result<bool, Box<dyn Error, Global>> {
+        let length = self.len() as u32;
+        length.serialize(w)?;
+
+        for c in self.chars() {
+            c.serialize(w)?;
+        }
+        Ok(true)
+    }
+}
+
+impl DeSerialize for String {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<bool, Box<dyn Error, Global>> {
+        let mut length :u32 = 0u32;
+        length.deserialize(r)?;
+
+        if length == 0 {
+            *self = String::from("");
+        } else {
+            let mut buffer: Vec<u8> = Vec::new();
+            // set capacity
+            buffer.reserve(length as usize);
+            // set size
+            buffer.resize(length as usize, 0x0 as u8);
+            r.read_exact(&mut buffer)?;
+            *self = buffer.iter().map(|x| *x as char).collect::<String>();
+        }
+        Ok(true)
+    }
+}
+
+impl<T: Serialize> Serialize for [T] {
+    fn serialize(&self, w: &mut dyn Write) -> Result<bool, Box<dyn Error, Global>> {
+        let length = self.len() as u32;
+        length.serialize(w)?;
+
+        for v in self.iter() {
+            v.serialize(w)?;
+        }
+        Ok(true)
+    }
+}
+
+impl<T: Serialize> Serialize for Option<T> {
+    fn serialize(&self, w: &mut dyn Write) -> Result<bool, Box<dyn Error, Global>> {
+        match self {
+            Some(v) => {
+                true.serialize(w)?;
+                v.serialize(w)?;
+            },
+            None => {
+                false.serialize(w)?;
+            }
+        }
+        Ok(true)
+    }
+}
+
+impl<T: DeSerialize> DeSerialize for Option<T> {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<bool, Box<dyn Error, Global>> {
+        let mut b: bool = false;
+        b.deserialize(r)?;
+
+        if !b {
+            *self = None;
+        } else {
+            match self {
+                Some(t) => {
+                    t.deserialize(r)?;
+                },
+                _ => {
+                    return Err("can not deserialize to None type")?;
+                }
+            }
+        }
+        Ok(true)
+    }
+}
+
 // impl Serialize for Vec<T> {
 // }
 //
@@ -892,5 +965,70 @@ mod tests {
         assert_eq!(*(buf.buffer().get(5).unwrap()) as char, 'b');
         assert_eq!(*(buf.buffer().get(6).unwrap()) as char, 'c');
         assert_eq!(*(buf.buffer().get(7).unwrap()) as char, 'd');
+    }
+
+    #[test]
+    fn test_serialize_deserialize_string() {
+        let mut buf = BufWriter::new(Vec::new());
+        assert_eq!(buf.buffer().len(), 0);
+        let _ = String::from("abcd").serialize(&mut buf);
+        assert_eq!(buf.buffer().len(), 8);
+        assert_eq!(*(buf.buffer().get(4).unwrap()) as char, 'a');
+        assert_eq!(*(buf.buffer().get(5).unwrap()) as char, 'b');
+        assert_eq!(*(buf.buffer().get(6).unwrap()) as char, 'c');
+        assert_eq!(*(buf.buffer().get(7).unwrap()) as char, 'd');
+
+        let mut buf = Cursor::new(buf.buffer());
+        let mut val: String = String::new();
+        let _ = val.deserialize(&mut buf);
+        assert_eq!(val, String::from("abcd"));
+    }
+
+    // with generic type
+    #[test]
+    fn test_serialize_slice() {
+        let l = ['a', 'b', 'c', 'd'];
+        let mut buf = BufWriter::new(Vec::new());
+        assert_eq!(buf.buffer().len(), 0);
+        let _ = l.serialize(&mut buf);
+        assert_eq!(buf.buffer().len(), 8);
+        assert_eq!(*(buf.buffer().get(4).unwrap()) as char, 'a');
+        assert_eq!(*(buf.buffer().get(5).unwrap()) as char, 'b');
+        assert_eq!(*(buf.buffer().get(6).unwrap()) as char, 'c');
+        assert_eq!(*(buf.buffer().get(7).unwrap()) as char, 'd');
+    }
+
+    // with generic type
+    #[test]
+    fn test_serialize_deserialize_option() {
+        // serialize/deserialize Some
+        let o: Option<String> = Some(String::from("abcd"));
+        let mut buf = BufWriter::new(Vec::new());
+        assert_eq!(buf.buffer().len(), 0);
+        let _ = o.serialize(&mut buf);
+        assert_eq!(buf.buffer().len(), 9);
+        assert_eq!(*(buf.buffer().get(0).unwrap()) as u8, 1);
+        assert_eq!(*(buf.buffer().get(5).unwrap()) as char, 'a');
+        assert_eq!(*(buf.buffer().get(6).unwrap()) as char, 'b');
+        assert_eq!(*(buf.buffer().get(7).unwrap()) as char, 'c');
+        assert_eq!(*(buf.buffer().get(8).unwrap()) as char, 'd');
+
+        let mut buf = Cursor::new(buf.buffer());
+        let mut val: Option<String> = Some(String::new());
+        let _ = val.deserialize(&mut buf);
+        assert_eq!(val, Some(String::from("abcd")));
+
+        // serialize/deserialize None
+        let o: Option<String> = None;
+        let mut buf = BufWriter::new(Vec::new());
+        assert_eq!(buf.buffer().len(), 0);
+        let _ = o.serialize(&mut buf);
+        assert_eq!(buf.buffer().len(), 1);
+        assert_eq!(*(buf.buffer().get(0).unwrap()) as u8, 0);
+
+        let mut buf = Cursor::new(buf.buffer());
+        let mut val: Option<String> = Some(String::new());
+        let _ = val.deserialize(&mut buf);
+        assert_eq!(val, None);
     }
 }
