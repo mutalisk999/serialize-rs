@@ -37,11 +37,11 @@ fn is_little_endian() -> bool {
     TEST_RESULT.deref().load(Ordering::Relaxed)
 }
 
-trait Serialize {
+pub trait Serialize {
     fn serialize(&self, w: &mut dyn Write)-> Result<(), Box<dyn Error, Global>>;
 }
 
-trait DeSerialize {
+pub trait DeSerialize {
     fn deserialize(&mut self, r: &mut dyn BufRead)-> Result<(), Box<dyn Error, Global>>;
 }
 
