@@ -613,12 +613,66 @@ impl<T: DeSerialize> DeSerialize for Option<T> {
     }
 }
 
-// impl Serialize for Vec<T> {
-// }
-//
-// impl Serialize for VecDeque<T> {
-// }
-//
+impl<T: Serialize> Serialize for Vec<T> {
+    fn serialize(&self, w: &mut dyn Write) -> Result<bool, Box<dyn Error, Global>> {
+        let length = self.len() as u32;
+        length.serialize(w)?;
+
+        for v in self.iter() {
+            v.serialize(w)?;
+        }
+        Ok(true)
+    }
+}
+
+impl<T: DeSerialize + Default> DeSerialize for Vec<T> {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<bool, Box<dyn Error, Global>> {
+        let mut length :u32 = 0u32;
+        length.deserialize(r)?;
+
+        let mut vec: Vec<T> = Vec::new();
+        if length != 0 {
+            for _ in 0..length {
+                let mut v: T = T::default();
+                v.deserialize(r)?;
+                vec.push(v);
+            }
+        }
+        *self = vec;
+        Ok(true)
+    }
+}
+
+impl<T: Serialize> Serialize for VecDeque<T> {
+    fn serialize(&self, w: &mut dyn Write) -> Result<bool, Box<dyn Error, Global>> {
+        let length = self.len() as u32;
+        length.serialize(w)?;
+
+        for v in self.iter() {
+            v.serialize(w)?;
+        }
+        Ok(true)
+    }
+}
+
+impl<T: DeSerialize + Default> DeSerialize for VecDeque<T> {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<bool, Box<dyn Error, Global>> {
+        let mut length :u32 = 0u32;
+        length.deserialize(r)?;
+
+        let mut vec_deque: VecDeque<T> = VecDeque::new();
+        if length != 0 {
+            for _ in 0..length {
+                let mut v: T = T::default();
+                v.deserialize(r)?;
+                vec_deque.push_back(v);
+            }
+        }
+        *self = vec_deque;
+        Ok(true)
+    }
+}
+
 // impl Serialize for LinkedList<T> {
 // }
 //
@@ -641,8 +695,7 @@ impl<T: DeSerialize> DeSerialize for Option<T> {
 mod tests {
     use crate::{is_little_endian, Serialize, DeSerialize};
     use std::io::{BufWriter, Cursor};
-    use std::error::Error;
-    use std::alloc::Global;
+    use std::collections::VecDeque;
 
     #[test]
     fn test_is_little_endian() {
@@ -1047,5 +1100,52 @@ mod tests {
             },
             _ => {}
         }
+    }
+
+    #[test]
+    fn test_serialize_deserialize_vector() {
+        let mut buf = BufWriter::new(Vec::new());
+        assert_eq!(buf.buffer().len(), 0);
+        let _ = vec!['a','b','c','d'].serialize(&mut buf);
+        assert_eq!(buf.buffer().len(), 8);
+        assert_eq!(*(buf.buffer().get(4).unwrap()) as char, 'a');
+        assert_eq!(*(buf.buffer().get(5).unwrap()) as char, 'b');
+        assert_eq!(*(buf.buffer().get(6).unwrap()) as char, 'c');
+        assert_eq!(*(buf.buffer().get(7).unwrap()) as char, 'd');
+
+        let mut buf = Cursor::new(buf.buffer());
+        let mut val: Vec<char> = Vec::new();
+        let _ = val.deserialize(&mut buf);
+        assert_eq!(val.len(), 4);
+        assert_eq!(val[0], 'a');
+        assert_eq!(val[1], 'b');
+        assert_eq!(val[2], 'c');
+        assert_eq!(val[3], 'd');
+    }
+
+    #[test]
+    fn test_serialize_deserialize_vector_deque() {
+        let mut buf = BufWriter::new(Vec::new());
+        assert_eq!(buf.buffer().len(), 0);
+        let mut vec_deque: VecDeque<char> = VecDeque::new();
+        vec_deque.push_back('a');
+        vec_deque.push_back('b');
+        vec_deque.push_back('c');
+        vec_deque.push_back('d');
+        let _ = vec_deque.serialize(&mut buf);
+        assert_eq!(buf.buffer().len(), 8);
+        assert_eq!(*(buf.buffer().get(4).unwrap()) as char, 'a');
+        assert_eq!(*(buf.buffer().get(5).unwrap()) as char, 'b');
+        assert_eq!(*(buf.buffer().get(6).unwrap()) as char, 'c');
+        assert_eq!(*(buf.buffer().get(7).unwrap()) as char, 'd');
+
+        let mut buf = Cursor::new(buf.buffer());
+        let mut val: VecDeque<char> = VecDeque::new();
+        let _ = val.deserialize(&mut buf);
+        assert_eq!(val.len(), 4);
+        assert_eq!(val[0], 'a');
+        assert_eq!(val[1], 'b');
+        assert_eq!(val[2], 'c');
+        assert_eq!(val[3], 'd');
     }
 }
