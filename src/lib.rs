@@ -748,23 +748,142 @@ impl<K,V> DeSerialize for HashMap<K,V>
     }
 }
 
-// impl Serialize for BTreeMap<K,V> {
-// }
-//
-// impl Serialize for HashSet<K> {
-// }
-//
-// impl Serialize for BTreeSet<K> {
-// }
-//
-// impl Serialize for BinaryHeap<T> {
-// }
+impl<K,V> Serialize for BTreeMap<K,V>
+    where K: Serialize + Ord, V: Serialize + Default {
+    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error, Global>> {
+        let length = self.len() as u32;
+        length.serialize(w)?;
+
+        for (k,v) in self.iter() {
+            k.serialize(w)?;
+            v.serialize(w)?;
+        }
+        Ok(())
+    }
+}
+
+impl<K,V> DeSerialize for BTreeMap<K,V>
+    where K: DeSerialize + Default + Ord, V: DeSerialize + Default{
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error, Global>> {
+        let mut length :u32 = 0u32;
+        length.deserialize(r)?;
+
+        let mut btree_map: BTreeMap<K,V> = BTreeMap::new();
+        if length != 0 {
+            for _ in 0..length {
+                let mut k: K = K::default();
+                let mut v: V = V::default();
+                k.deserialize(r)?;
+                v.deserialize(r)?;
+                btree_map.insert(k,v);
+            }
+        }
+        *self = btree_map;
+        Ok(())
+    }
+}
+
+impl<K> Serialize for HashSet<K>
+    where K: Serialize + Hash {
+    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error, Global>> {
+        let length = self.len() as u32;
+        length.serialize(w)?;
+
+        for k in self.iter() {
+            k.serialize(w)?;
+        }
+        Ok(())
+    }
+}
+
+impl<K> DeSerialize for HashSet<K>
+    where K: DeSerialize + Default + Hash + Eq {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error, Global>> {
+        let mut length :u32 = 0u32;
+        length.deserialize(r)?;
+
+        let mut hash_set: HashSet<K> = HashSet::new();
+        if length != 0 {
+            for _ in 0..length {
+                let mut k: K = K::default();
+                k.deserialize(r)?;
+                hash_set.insert(k);
+            }
+        }
+        *self = hash_set;
+        Ok(())
+    }
+}
+
+impl<K> Serialize for BTreeSet<K>
+    where K: Serialize + Ord {
+    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error, Global>> {
+        let length = self.len() as u32;
+        length.serialize(w)?;
+
+        for k in self.iter() {
+            k.serialize(w)?;
+        }
+        Ok(())
+    }
+}
+
+impl<K> DeSerialize for BTreeSet<K>
+    where K: DeSerialize + Default + Ord {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error, Global>> {
+        let mut length :u32 = 0u32;
+        length.deserialize(r)?;
+
+        let mut btree_set: BTreeSet<K> = BTreeSet::new();
+        if length != 0 {
+            for _ in 0..length {
+                let mut k: K = K::default();
+                k.deserialize(r)?;
+                btree_set.insert(k);
+            }
+        }
+        *self = btree_set;
+        Ok(())
+    }
+}
+
+impl<T> Serialize for BinaryHeap<T>
+    where T: Serialize + Ord {
+    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error, Global>> {
+        let length = self.len() as u32;
+        length.serialize(w)?;
+
+        for k in self.iter() {
+            k.serialize(w)?;
+        }
+        Ok(())
+    }
+}
+
+impl<T> DeSerialize for BinaryHeap<T>
+    where T: DeSerialize + Default + Ord {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error, Global>> {
+        let mut length :u32 = 0u32;
+        length.deserialize(r)?;
+
+        let mut binary_heap: BinaryHeap<T> = BinaryHeap::new();
+        if length != 0 {
+            for _ in 0..length {
+                let mut t: T = T::default();
+                t.deserialize(r)?;
+                binary_heap.push(t);
+            }
+        }
+        *self = binary_heap;
+        Ok(())
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use crate::{is_little_endian, Serialize, DeSerialize};
     use std::io::{BufWriter, Cursor};
-    use std::collections::{VecDeque, LinkedList, HashMap};
+    use std::collections::{VecDeque, LinkedList, HashMap, BTreeMap, HashSet, BTreeSet, BinaryHeap};
 
     #[test]
     fn test_is_little_endian() {
@@ -1264,5 +1383,93 @@ mod tests {
         assert_eq!(*val.get(&'b').unwrap(), 1i8);
         assert_eq!(*val.get(&'c').unwrap(), 2i8);
         assert_eq!(*val.get(&'d').unwrap(), 3i8);
+    }
+
+    #[test]
+    fn test_serialize_deserialize_btree_map() {
+        let mut buf = BufWriter::new(Vec::new());
+        assert_eq!(buf.buffer().len(), 0);
+        let mut btree_map: BTreeMap<char, i8> = BTreeMap::new();
+        btree_map.insert('a', 0i8);
+        btree_map.insert('b', 1i8);
+        btree_map.insert('c', 2i8);
+        btree_map.insert('d', 3i8);
+        let _ = btree_map.serialize(&mut buf);
+        assert_eq!(buf.buffer().len(), 12);
+
+        let mut buf = Cursor::new(buf.buffer());
+        let mut val: BTreeMap<char, i8> = BTreeMap::new();
+        let _ = val.deserialize(&mut buf);
+        assert_eq!(val.len(), 4);
+        assert_eq!(*val.get(&'a').unwrap(), 0i8);
+        assert_eq!(*val.get(&'b').unwrap(), 1i8);
+        assert_eq!(*val.get(&'c').unwrap(), 2i8);
+        assert_eq!(*val.get(&'d').unwrap(), 3i8);
+    }
+
+    #[test]
+    fn test_serialize_deserialize_hash_set() {
+        let mut buf = BufWriter::new(Vec::new());
+        assert_eq!(buf.buffer().len(), 0);
+        let mut hash_set: HashSet<char> = HashSet::new();
+        hash_set.insert('a');
+        hash_set.insert('b');
+        hash_set.insert('c');
+        hash_set.insert('d');
+        let _ = hash_set.serialize(&mut buf);
+        assert_eq!(buf.buffer().len(), 8);
+
+        let mut buf = Cursor::new(buf.buffer());
+        let mut val: HashSet<char> = HashSet::new();
+        let _ = val.deserialize(&mut buf);
+        assert_eq!(val.len(), 4);
+        assert_eq!(*val.get(&'a').unwrap(), 'a');
+        assert_eq!(*val.get(&'b').unwrap(), 'b');
+        assert_eq!(*val.get(&'c').unwrap(), 'c');
+        assert_eq!(*val.get(&'d').unwrap(), 'd');
+    }
+
+    #[test]
+    fn test_serialize_deserialize_btree_set() {
+        let mut buf = BufWriter::new(Vec::new());
+        assert_eq!(buf.buffer().len(), 0);
+        let mut btree_set: BTreeSet<char> = BTreeSet::new();
+        btree_set.insert('a');
+        btree_set.insert('b');
+        btree_set.insert('c');
+        btree_set.insert('d');
+        let _ = btree_set.serialize(&mut buf);
+        assert_eq!(buf.buffer().len(), 8);
+
+        let mut buf = Cursor::new(buf.buffer());
+        let mut val: BTreeSet<char> = BTreeSet::new();
+        let _ = val.deserialize(&mut buf);
+        assert_eq!(val.len(), 4);
+        assert_eq!(*val.get(&'a').unwrap(), 'a');
+        assert_eq!(*val.get(&'b').unwrap(), 'b');
+        assert_eq!(*val.get(&'c').unwrap(), 'c');
+        assert_eq!(*val.get(&'d').unwrap(), 'd');
+    }
+
+    #[test]
+    fn test_serialize_deserialize_binary_heap() {
+        let mut buf = BufWriter::new(Vec::new());
+        assert_eq!(buf.buffer().len(), 0);
+        let mut binary_heap: BinaryHeap<char> = BinaryHeap::new();
+        binary_heap.push('c');
+        binary_heap.push('a');
+        binary_heap.push('d');
+        binary_heap.push('b');
+        let _ = binary_heap.serialize(&mut buf);
+        assert_eq!(buf.buffer().len(), 8);
+
+        let mut buf = Cursor::new(buf.buffer());
+        let mut val: BinaryHeap<char> = BinaryHeap::new();
+        let _ = val.deserialize(&mut buf);
+        assert_eq!(val.len(), 4);
+        assert_eq!(val.pop().unwrap(), 'd');
+        assert_eq!(val.pop().unwrap(), 'c');
+        assert_eq!(val.pop().unwrap(), 'b');
+        assert_eq!(val.pop().unwrap(), 'a');
     }
 }
