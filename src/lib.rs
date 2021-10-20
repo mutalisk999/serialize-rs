@@ -879,11 +879,39 @@ impl<T> DeSerialize for BinaryHeap<T>
     }
 }
 
+macro_rules! serialize_struct {
+    ($struct_name:ty, $($member_name:ident),*) => {
+        impl Serialize for $struct_name {
+            fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error, Global>> {
+                $(
+                    self.$member_name.serialize(w)?;
+                )*
+                Ok(())
+            }
+        }
+    };
+}
+
+macro_rules! deserialize_struct {
+    ($struct_name:ty, $($member_name:ident),*) => {
+        impl DeSerialize for $struct_name {
+            fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error, Global>> {
+                $(
+                    self.$member_name.deserialize(r)?;
+                )*
+                Ok(())
+            }
+        }
+    };
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{is_little_endian, Serialize, DeSerialize};
-    use std::io::{BufWriter, Cursor};
+    use std::io::{BufWriter, Cursor, Write, BufRead};
     use std::collections::{VecDeque, LinkedList, HashMap, BTreeMap, HashSet, BTreeSet, BinaryHeap};
+    use std::error::Error;
+    use std::alloc::Global;
 
     #[test]
     fn test_is_little_endian() {
@@ -1471,5 +1499,96 @@ mod tests {
         assert_eq!(val.pop().unwrap(), 'c');
         assert_eq!(val.pop().unwrap(), 'b');
         assert_eq!(val.pop().unwrap(), 'a');
+    }
+
+    #[test]
+    fn test_serialize_deserialize_struct() {
+        #[derive(Debug)]
+        struct Xxxx
+        {
+            a: i32,
+            b: String,
+            c: Option<f32>
+        }
+
+        impl Xxxx {
+            fn new() -> Xxxx {
+                Xxxx {
+                    a: 0i32,
+                    b: String::new(),
+                    c: Some(0.0f32)
+                }
+            }
+        }
+
+        impl Serialize for Xxxx {
+            fn serialize(&self, w: &mut dyn Write)-> Result<(), Box<dyn Error, Global>> {
+                self.a.serialize(w)?;
+                self.b.serialize(w)?;
+                self.c.serialize(w)?;
+                Ok(())
+            }
+        }
+
+        impl DeSerialize for Xxxx {
+            fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error, Global>> {
+                self.a.deserialize(r)?;
+                self.b.deserialize(r)?;
+                self.c.deserialize(r)?;
+                Ok(())
+            }
+        }
+
+        let mut x = Xxxx::new();
+        x.a = 100;
+        x.b = String::from("hello world");
+        x.c = Some(0.123456f32);
+        let mut buf = BufWriter::new(Vec::new());
+        let _ = x.serialize(&mut buf);
+
+        let mut buf = Cursor::new(buf.buffer());
+        let mut val: Xxxx = Xxxx::new();
+        let _ = val.deserialize(&mut buf);
+        assert_eq!(val.a, 100);
+        assert_eq!(val.b, String::from("hello world"));
+        assert_eq!(val.c, Some(0.123456f32));
+    }
+
+    #[test]
+    fn test_serialize_deserialize_struct_with_macro() {
+        #[derive(Debug)]
+        struct Xxxx
+        {
+            a: i32,
+            b: String,
+            c: Option<f32>
+        }
+
+        impl Xxxx {
+            fn new() -> Xxxx {
+                Xxxx {
+                    a: 0i32,
+                    b: String::new(),
+                    c: Some(0.0f32)
+                }
+            }
+        }
+
+        serialize_struct!(Xxxx, a, b, c);
+        deserialize_struct!(Xxxx, a, b, c);
+
+        let mut x = Xxxx::new();
+        x.a = 100;
+        x.b = String::from("hello world");
+        x.c = Some(0.123456f32);
+        let mut buf = BufWriter::new(Vec::new());
+        let _ = x.serialize(&mut buf);
+
+        let mut buf = Cursor::new(buf.buffer());
+        let mut val: Xxxx = Xxxx::new();
+        let _ = val.deserialize(&mut buf);
+        assert_eq!(val.a, 100);
+        assert_eq!(val.b, String::from("hello world"));
+        assert_eq!(val.c, Some(0.123456f32));
     }
 }
