@@ -41,7 +41,7 @@ impl Xxxx {
 }
 
 impl Serialize for Xxxx {
-    fn serialize(&self, w: &mut dyn Write)-> Result<(), Box<dyn Error, Global>> {
+    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error, Global>> {
         self.a.serialize(w)?;
         self.b.serialize(w)?;
         self.c.serialize(w)?;
@@ -81,3 +81,61 @@ output print
 Xxxx { a: 0, b: "", c: Some(0.0) }
 Xxxx { a: 100, b: "hello world", c: Some(0.123456) }
 ```
+
+or simply
+
+```
+#![feature(allocator_api)]
+
+extern crate serialize_rs;
+
+use std::io::{BufRead, Write, BufWriter, Cursor};
+use std::error::Error;
+use serialize_rs::{Serialize, DeSerialize, serialize_struct, deserialize_struct};
+use std::alloc::Global;
+
+#[derive(Debug)]
+struct Xxxx
+{
+    a: i32,
+    b: String,
+    c: Option<f32>
+}
+
+impl Xxxx {
+    fn new() -> Xxxx {
+        Xxxx {
+            a: 0i32,
+            b: String::new(),
+            c: Some(0.0f32)
+        }
+    }
+}
+
+serialize_struct!(Xxxx, a, b, c);
+deserialize_struct!(Xxxx, a, b, c);
+
+fn main() {
+    let mut x = Xxxx::new();
+    x.a = 100;
+    x.b = String::from("hello world");
+    x.c = Some(0.123456f32);
+    let mut buf = BufWriter::new(Vec::new());
+    let _ = x.serialize(&mut buf);
+
+    let mut buf = Cursor::new(buf.buffer());
+    let mut val: Xxxx = Xxxx::new();
+    println!("{:?}", val);
+    let _ = val.deserialize(&mut buf);
+    println!("{:?}", val);
+}
+```
+
+output print
+
+```
+Xxxx { a: 0, b: "", c: Some(0.0) }
+Xxxx { a: 100, b: "hello world", c: Some(0.123456) }
+```
+
+
