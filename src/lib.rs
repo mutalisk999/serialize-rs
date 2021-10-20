@@ -879,6 +879,7 @@ impl<T> DeSerialize for BinaryHeap<T>
     }
 }
 
+#[macro_export]
 macro_rules! serialize_struct {
     ($struct_name:ty, $($member_name:ident),*) => {
         impl Serialize for $struct_name {
@@ -892,6 +893,7 @@ macro_rules! serialize_struct {
     };
 }
 
+#[macro_export]
 macro_rules! deserialize_struct {
     ($struct_name:ty, $($member_name:ident),*) => {
         impl DeSerialize for $struct_name {
