@@ -1,52 +1,18 @@
-#![feature(allocator_api)]
-
 use std::collections::{VecDeque, LinkedList, HashMap, BTreeMap, HashSet, BTreeSet, BinaryHeap};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::io::{BufRead, Write};
 use std::error::Error;
-
-use lazy_static::*;
-use std::alloc::Global;
 use std::hash::Hash;
 
-lazy_static! {
-    static ref TEST_BEFORE: AtomicBool = AtomicBool::new(false);
-    static ref TEST_RESULT: AtomicBool = AtomicBool::new(false);
-}
-
-fn is_little_endian() -> bool {
-    if !TEST_BEFORE.deref().load(Ordering::Relaxed) {
-        unsafe {
-            union Value {
-                value_u16: u16,
-                value_u8s: [u8; 2],
-            }
-
-            let val = Value { value_u16: 0x0102u16 };
-
-            if val.value_u8s[0] == 0x01u8 && val.value_u8s[1] == 0x02u8 {
-                TEST_RESULT.deref().store(false, Ordering::Relaxed);
-            } else if val.value_u8s[0] == 0x02u8 && val.value_u8s[1] == 0x01u8 {
-                TEST_RESULT.deref().store(true, Ordering::Relaxed);
-            } else {
-                panic!("is_little_endian: maybe something wrong");
-            }
-        }
-        TEST_BEFORE.deref().store(true, Ordering::Relaxed);
-    }
-    TEST_RESULT.deref().load(Ordering::Relaxed)
-}
-
 pub trait Serialize {
-    fn serialize(&self, w: &mut dyn Write)-> Result<(), Box<dyn Error, Global>>;
+    fn serialize(&self, w: &mut dyn Write)-> Result<(), Box<dyn Error>>;
 }
 
 pub trait DeSerialize {
-    fn deserialize(&mut self, r: &mut dyn BufRead)-> Result<(), Box<dyn Error, Global>>;
+    fn deserialize(&mut self, r: &mut dyn BufRead)-> Result<(), Box<dyn Error>>;
 }
 
 impl Serialize for bool {
-    fn serialize(&self, w: &mut dyn Write)-> Result<(), Box<dyn Error, Global>> {
+    fn serialize(&self, w: &mut dyn Write)-> Result<(), Box<dyn Error>> {
         if *self {
             w.write_all(&[0x1u8])?;
         } else {
@@ -57,7 +23,7 @@ impl Serialize for bool {
 }
 
 impl DeSerialize for bool {
-    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error, Global>> {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error>> {
         let mut buffer = [0x0u8; 1];
         r.read_exact(&mut buffer)?;
 
@@ -73,14 +39,14 @@ impl DeSerialize for bool {
 }
 
 impl Serialize for char {
-    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error, Global>> {
+    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error>> {
         w.write_all(&[self.clone() as u8])?;
         Ok(())
     }
 }
 
 impl DeSerialize for char {
-    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error, Global>> {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error>> {
         let mut buffer = [0x0u8; 1];
         r.read_exact(&mut buffer)?;
         *self = buffer[0] as char;
@@ -89,14 +55,14 @@ impl DeSerialize for char {
 }
 
 impl Serialize for i8 {
-    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error, Global>> {
+    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error>> {
         w.write_all(&[self.clone() as u8])?;
         Ok(())
     }
 }
 
 impl DeSerialize for i8 {
-    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error, Global>> {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error>> {
         let mut buffer = [0x0u8; 1];
         r.read_exact(&mut buffer)?;
         *self = buffer[0] as i8;
@@ -105,14 +71,14 @@ impl DeSerialize for i8 {
 }
 
 impl Serialize for u8 {
-    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error, Global>> {
+    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error>> {
         w.write_all(&[self.clone()])?;
         Ok(())
     }
 }
 
 impl DeSerialize for u8 {
-    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error, Global>> {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error>> {
         let mut buffer = [0x0u8; 1];
         r.read_exact(&mut buffer)?;
         *self = buffer[0];
@@ -121,409 +87,167 @@ impl DeSerialize for u8 {
 }
 
 impl Serialize for i16 {
-    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error, Global>> {
-        unsafe {
-            union Value {
-                value_i16: i16,
-                value_u8s: [u8; 2],
-            }
-
-            let v = Value { value_i16 : self.clone() };
-            if is_little_endian() {
-                let mut r = v.value_u8s.clone();
-                r.reverse();
-                w.write_all(&r)?;
-            } else {
-                w.write_all(&v.value_u8s)?;
-            }
-        }
+    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error>> {
+        w.write_all(&i16::to_be_bytes(self.clone()))?;
         Ok(())
     }
 }
 
 impl DeSerialize for i16 {
-    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error, Global>> {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error>> {
         let mut buffer = [0x0u8; 2];
         r.read_exact(&mut buffer)?;
-
-        unsafe {
-            union Value {
-                value_i16: i16,
-                value_u8s: [u8; 2],
-            }
-
-            if is_little_endian() {
-                buffer.reverse();
-            }
-            let v = Value { value_u8s : buffer };
-            *self = v.value_i16;
-        }
+        *self = i16::from_be_bytes(buffer);
         Ok(())
     }
 }
 
 impl Serialize for u16 {
-    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error, Global>> {
-        unsafe {
-            union Value {
-                value_u16: u16,
-                value_u8s: [u8; 2],
-            }
-
-            let v = Value { value_u16 : self.clone() };
-            if is_little_endian() {
-                let mut r = v.value_u8s.clone();
-                r.reverse();
-                w.write_all(&r)?;
-            } else {
-                w.write_all(&v.value_u8s)?;
-            }
-        }
+    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error>> {
+        w.write_all(&u16::to_be_bytes(self.clone()))?;
         Ok(())
     }
 }
 
 impl DeSerialize for u16 {
-    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error, Global>> {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error>> {
         let mut buffer = [0x0u8; 2];
         r.read_exact(&mut buffer)?;
-
-        unsafe {
-            union Value {
-                value_u16: u16,
-                value_u8s: [u8; 2],
-            }
-
-            if is_little_endian() {
-                buffer.reverse();
-            }
-            let v = Value { value_u8s : buffer };
-            *self = v.value_u16;
-        }
+        *self = u16::from_be_bytes(buffer);
         Ok(())
     }
 }
 
 impl Serialize for i32 {
-    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error, Global>> {
-        unsafe {
-            union Value {
-                value_i32: i32,
-                value_u8s: [u8; 4],
-            }
-
-            let v = Value { value_i32 : self.clone() };
-            if is_little_endian() {
-                let mut r = v.value_u8s.clone();
-                r.reverse();
-                w.write_all(&r)?;
-            } else {
-                w.write_all(&v.value_u8s)?;
-            }
-        }
+    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error>> {
+        w.write_all(&i32::to_be_bytes(self.clone()))?;
         Ok(())
     }
 }
 
 impl DeSerialize for i32 {
-    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error, Global>> {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error>> {
         let mut buffer = [0x0u8; 4];
         r.read_exact(&mut buffer)?;
-
-        unsafe {
-            union Value {
-                value_i32: i32,
-                value_u8s: [u8; 4],
-            }
-
-            if is_little_endian() {
-                buffer.reverse();
-            }
-            let v = Value { value_u8s : buffer };
-            *self = v.value_i32;
-        }
+        *self = i32::from_be_bytes(buffer);
         Ok(())
     }
 }
 
 impl Serialize for u32 {
-    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error, Global>> {
-        unsafe {
-            union Value {
-                value_u32: u32,
-                value_u8s: [u8; 4],
-            }
-
-            let v = Value { value_u32 : self.clone() };
-            if is_little_endian() {
-                let mut r = v.value_u8s.clone();
-                r.reverse();
-                w.write_all(&r)?;
-            } else {
-                w.write_all(&v.value_u8s)?;
-            }
-        }
+    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error>> {
+        w.write_all(&u32::to_be_bytes(self.clone()))?;
         Ok(())
     }
 }
 
 impl DeSerialize for u32 {
-    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error, Global>> {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error>> {
         let mut buffer = [0x0u8; 4];
         r.read_exact(&mut buffer)?;
-
-        unsafe {
-            union Value {
-                value_u32: u32,
-                value_u8s: [u8; 4],
-            }
-
-            if is_little_endian() {
-                buffer.reverse();
-            }
-            let v = Value { value_u8s : buffer };
-            *self = v.value_u32;
-        }
+        *self = u32::from_be_bytes(buffer);
         Ok(())
     }
 }
 
 impl Serialize for i64 {
-    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error, Global>> {
-        unsafe {
-            union Value {
-                value_i64: i64,
-                value_u8s: [u8; 8],
-            }
-
-            let v = Value { value_i64 : self.clone() };
-            if is_little_endian() {
-                let mut r = v.value_u8s.clone();
-                r.reverse();
-                w.write_all(&r)?;
-            } else {
-                w.write_all(&v.value_u8s)?;
-            }
-        }
+    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error>> {
+        w.write_all(&i64::to_be_bytes(self.clone()))?;
         Ok(())
     }
 }
 
 impl DeSerialize for i64 {
-    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error, Global>> {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error>> {
         let mut buffer = [0x0u8; 8];
         r.read_exact(&mut buffer)?;
-
-        unsafe {
-            union Value {
-                value_i64: i64,
-                value_u8s: [u8; 8],
-            }
-
-            if is_little_endian() {
-                buffer.reverse();
-            }
-            let v = Value { value_u8s : buffer };
-            *self = v.value_i64;
-        }
+        *self = i64::from_be_bytes(buffer);
         Ok(())
     }
 }
 
 impl Serialize for u64 {
-    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error, Global>> {
-        unsafe {
-            union Value {
-                value_u64: u64,
-                value_u8s: [u8; 8],
-            }
-
-            let v = Value { value_u64 : self.clone() };
-            if is_little_endian() {
-                let mut r = v.value_u8s.clone();
-                r.reverse();
-                w.write_all(&r)?;
-            } else {
-                w.write_all(&v.value_u8s)?;
-            }
-        }
+    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error>> {
+        w.write_all(&u64::to_be_bytes(self.clone()))?;
         Ok(())
     }
 }
 
 impl DeSerialize for u64 {
-    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error, Global>> {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error>> {
         let mut buffer = [0x0u8; 8];
         r.read_exact(&mut buffer)?;
-
-        unsafe {
-            union Value {
-                value_u64: u64,
-                value_u8s: [u8; 8],
-            }
-
-            if is_little_endian() {
-                buffer.reverse();
-            }
-            let v = Value { value_u8s : buffer };
-            *self = v.value_u64;
-        }
+        *self = u64::from_be_bytes(buffer);
         Ok(())
     }
 }
 
 impl Serialize for i128 {
-    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error, Global>> {
-        unsafe {
-            union Value {
-                value_i128: i128,
-                value_u8s: [u8; 16],
-            }
-
-            let v = Value { value_i128 : self.clone() };
-            if is_little_endian() {
-                let mut r = v.value_u8s.clone();
-                r.reverse();
-                w.write_all(&r)?;
-            } else {
-                w.write_all(&v.value_u8s)?;
-            }
-        }
+    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error>> {
+        w.write_all(&i128::to_be_bytes(self.clone()))?;
         Ok(())
     }
 }
 
 impl DeSerialize for i128 {
-    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error, Global>> {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error>> {
         let mut buffer = [0x0u8; 16];
         r.read_exact(&mut buffer)?;
-
-        unsafe {
-            union Value {
-                value_i128: i128,
-                value_u8s: [u8; 16],
-            }
-
-            if is_little_endian() {
-                buffer.reverse();
-            }
-            let v = Value { value_u8s : buffer };
-            *self = v.value_i128;
-        }
+        *self = i128::from_be_bytes(buffer);
         Ok(())
     }
 }
 
 impl Serialize for u128 {
-    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error, Global>> {
-        unsafe {
-            union Value {
-                value_u128: u128,
-                value_u8s: [u8; 16],
-            }
-
-            let v = Value { value_u128 : self.clone() };
-            if is_little_endian() {
-                let mut r = v.value_u8s.clone();
-                r.reverse();
-                w.write_all(&r)?;
-            } else {
-                w.write_all(&v.value_u8s)?;
-            }
-        }
+    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error>> {
+        w.write_all(&u128::to_be_bytes(self.clone()))?;
         Ok(())
     }
 }
 
 impl DeSerialize for u128 {
-    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error, Global>> {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error>> {
         let mut buffer = [0x0u8; 16];
         r.read_exact(&mut buffer)?;
-
-        unsafe {
-            union Value {
-                value_u128: u128,
-                value_u8s: [u8; 16],
-            }
-
-            if is_little_endian() {
-                buffer.reverse();
-            }
-            let v = Value { value_u8s : buffer };
-            *self = v.value_u128;
-        }
+        *self = u128::from_be_bytes(buffer);
         Ok(())
     }
 }
 
 impl Serialize for f32 {
-    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error, Global>> {
-        unsafe {
-            union Value {
-                value_f32: f32,
-                value_u8s: [u8; 4],
-            }
-
-            let v = Value { value_f32 : self.clone() };
-            w.write_all(&v.value_u8s)?;
-        }
+    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error>> {
+        w.write_all(&f32::to_be_bytes(self.clone()))?;
         Ok(())
     }
 }
 
 impl DeSerialize for f32 {
-    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error, Global>> {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error>> {
         let mut buffer = [0x0u8; 4];
         r.read_exact(&mut buffer)?;
-
-        unsafe {
-            union Value {
-                value_f32: f32,
-                value_u8s: [u8; 4],
-            }
-
-            let v = Value { value_u8s : buffer };
-            *self = v.value_f32;
-        }
+        *self = f32::from_be_bytes(buffer);
         Ok(())
     }
 }
 
 impl Serialize for f64 {
-    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error, Global>> {
-        unsafe {
-            union Value {
-                value_f64: f64,
-                value_u8s: [u8; 8],
-            }
-
-            let v = Value { value_f64 : self.clone() };
-            w.write_all(&v.value_u8s)?;
-        }
+    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error>> {
+        w.write_all(&f64::to_be_bytes(self.clone()))?;
         Ok(())
     }
 }
 
 impl DeSerialize for f64 {
-    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error, Global>> {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error>> {
         let mut buffer = [0x0u8; 8];
         r.read_exact(&mut buffer)?;
-
-        unsafe {
-            union Value {
-                value_f64: f64,
-                value_u8s: [u8; 8],
-            }
-
-            let v = Value { value_u8s : buffer };
-            *self = v.value_f64;
-        }
+        *self = f64::from_be_bytes(buffer);
         Ok(())
     }
 }
 
 impl Serialize for str {
-    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error, Global>> {
+    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error>> {
         let length = self.len() as u32;
         length.serialize(w)?;
 
@@ -535,7 +259,7 @@ impl Serialize for str {
 }
 
 impl Serialize for String {
-    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error, Global>> {
+    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error>> {
         let length = self.len() as u32;
         length.serialize(w)?;
 
@@ -547,7 +271,7 @@ impl Serialize for String {
 }
 
 impl DeSerialize for String {
-    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error, Global>> {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error>> {
         let mut length :u32 = 0u32;
         length.deserialize(r)?;
 
@@ -568,7 +292,7 @@ impl DeSerialize for String {
 
 impl<T> Serialize for [T]
     where T: Serialize {
-    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error, Global>> {
+    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error>> {
         let length = self.len() as u32;
         length.serialize(w)?;
 
@@ -581,7 +305,7 @@ impl<T> Serialize for [T]
 
 impl<T> Serialize for Option<T>
     where T: Serialize {
-    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error, Global>> {
+    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error>> {
         match self {
             Some(v) => {
                 true.serialize(w)?;
@@ -597,7 +321,7 @@ impl<T> Serialize for Option<T>
 
 impl<T> DeSerialize for Option<T>
     where T: DeSerialize {
-    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error, Global>> {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error>> {
         let mut b: bool = false;
         b.deserialize(r)?;
 
@@ -619,7 +343,7 @@ impl<T> DeSerialize for Option<T>
 
 impl<T> Serialize for Vec<T>
     where T: Serialize {
-    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error, Global>> {
+    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error>> {
         let length = self.len() as u32;
         length.serialize(w)?;
 
@@ -632,7 +356,7 @@ impl<T> Serialize for Vec<T>
 
 impl<T> DeSerialize for Vec<T>
     where T: DeSerialize + Default {
-    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error, Global>> {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error>> {
         let mut length :u32 = 0u32;
         length.deserialize(r)?;
 
@@ -651,7 +375,7 @@ impl<T> DeSerialize for Vec<T>
 
 impl<T> Serialize for VecDeque<T>
     where T: Serialize {
-    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error, Global>> {
+    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error>> {
         let length = self.len() as u32;
         length.serialize(w)?;
 
@@ -664,7 +388,7 @@ impl<T> Serialize for VecDeque<T>
 
 impl<T> DeSerialize for VecDeque<T>
     where T: DeSerialize + Default {
-    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error, Global>> {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error>> {
         let mut length :u32 = 0u32;
         length.deserialize(r)?;
 
@@ -683,7 +407,7 @@ impl<T> DeSerialize for VecDeque<T>
 
 impl<T> Serialize for LinkedList<T>
     where T: Serialize {
-    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error, Global>> {
+    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error>> {
         let length = self.len() as u32;
         length.serialize(w)?;
 
@@ -696,7 +420,7 @@ impl<T> Serialize for LinkedList<T>
 
 impl<T> DeSerialize for LinkedList<T>
     where T: DeSerialize + Default {
-    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error, Global>> {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error>> {
         let mut length :u32 = 0u32;
         length.deserialize(r)?;
 
@@ -715,7 +439,7 @@ impl<T> DeSerialize for LinkedList<T>
 
 impl<K,V> Serialize for HashMap<K,V>
     where K: Serialize + Hash, V: Serialize {
-    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error, Global>> {
+    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error>> {
         let length = self.len() as u32;
         length.serialize(w)?;
 
@@ -729,7 +453,7 @@ impl<K,V> Serialize for HashMap<K,V>
 
 impl<K,V> DeSerialize for HashMap<K,V>
     where K: DeSerialize + Default + Hash + Eq, V: DeSerialize + Default {
-    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error, Global>> {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error>> {
         let mut length :u32 = 0u32;
         length.deserialize(r)?;
 
@@ -750,7 +474,7 @@ impl<K,V> DeSerialize for HashMap<K,V>
 
 impl<K,V> Serialize for BTreeMap<K,V>
     where K: Serialize + Ord, V: Serialize + Default {
-    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error, Global>> {
+    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error>> {
         let length = self.len() as u32;
         length.serialize(w)?;
 
@@ -764,7 +488,7 @@ impl<K,V> Serialize for BTreeMap<K,V>
 
 impl<K,V> DeSerialize for BTreeMap<K,V>
     where K: DeSerialize + Default + Ord, V: DeSerialize + Default{
-    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error, Global>> {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error>> {
         let mut length :u32 = 0u32;
         length.deserialize(r)?;
 
@@ -785,7 +509,7 @@ impl<K,V> DeSerialize for BTreeMap<K,V>
 
 impl<K> Serialize for HashSet<K>
     where K: Serialize + Hash {
-    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error, Global>> {
+    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error>> {
         let length = self.len() as u32;
         length.serialize(w)?;
 
@@ -798,7 +522,7 @@ impl<K> Serialize for HashSet<K>
 
 impl<K> DeSerialize for HashSet<K>
     where K: DeSerialize + Default + Hash + Eq {
-    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error, Global>> {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error>> {
         let mut length :u32 = 0u32;
         length.deserialize(r)?;
 
@@ -817,7 +541,7 @@ impl<K> DeSerialize for HashSet<K>
 
 impl<K> Serialize for BTreeSet<K>
     where K: Serialize + Ord {
-    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error, Global>> {
+    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error>> {
         let length = self.len() as u32;
         length.serialize(w)?;
 
@@ -830,7 +554,7 @@ impl<K> Serialize for BTreeSet<K>
 
 impl<K> DeSerialize for BTreeSet<K>
     where K: DeSerialize + Default + Ord {
-    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error, Global>> {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error>> {
         let mut length :u32 = 0u32;
         length.deserialize(r)?;
 
@@ -849,7 +573,7 @@ impl<K> DeSerialize for BTreeSet<K>
 
 impl<T> Serialize for BinaryHeap<T>
     where T: Serialize + Ord {
-    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error, Global>> {
+    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error>> {
         let length = self.len() as u32;
         length.serialize(w)?;
 
@@ -862,7 +586,7 @@ impl<T> Serialize for BinaryHeap<T>
 
 impl<T> DeSerialize for BinaryHeap<T>
     where T: DeSerialize + Default + Ord {
-    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error, Global>> {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error>> {
         let mut length :u32 = 0u32;
         length.deserialize(r)?;
 
@@ -883,7 +607,7 @@ impl<T> DeSerialize for BinaryHeap<T>
 macro_rules! serialize_struct {
     ($struct_name:ty, $($member_name:ident),*) => {
         impl Serialize for $struct_name {
-            fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error, Global>> {
+            fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error>> {
                 $(
                     self.$member_name.serialize(w)?;
                 )*
@@ -897,7 +621,7 @@ macro_rules! serialize_struct {
 macro_rules! deserialize_struct {
     ($struct_name:ty, $($member_name:ident),*) => {
         impl DeSerialize for $struct_name {
-            fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error, Global>> {
+            fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error>> {
                 $(
                     self.$member_name.deserialize(r)?;
                 )*
@@ -909,16 +633,11 @@ macro_rules! deserialize_struct {
 
 #[cfg(test)]
 mod tests {
-    use crate::{is_little_endian, Serialize, DeSerialize};
+    // use crate::is_little_endian;
+    use crate::{Serialize, DeSerialize};
     use std::io::{BufWriter, Cursor, Write, BufRead};
     use std::collections::{VecDeque, LinkedList, HashMap, BTreeMap, HashSet, BTreeSet, BinaryHeap};
     use std::error::Error;
-    use std::alloc::Global;
-
-    #[test]
-    fn test_is_little_endian() {
-        assert_eq!(is_little_endian(), true);
-    }
 
     #[test]
     fn test_serialize_bool() {
@@ -1524,7 +1243,7 @@ mod tests {
         }
 
         impl Serialize for Xxxx {
-            fn serialize(&self, w: &mut dyn Write)-> Result<(), Box<dyn Error, Global>> {
+            fn serialize(&self, w: &mut dyn Write)-> Result<(), Box<dyn Error>> {
                 self.a.serialize(w)?;
                 self.b.serialize(w)?;
                 self.c.serialize(w)?;
@@ -1533,7 +1252,7 @@ mod tests {
         }
 
         impl DeSerialize for Xxxx {
-            fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error, Global>> {
+            fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error>> {
                 self.a.deserialize(r)?;
                 self.b.deserialize(r)?;
                 self.c.deserialize(r)?;

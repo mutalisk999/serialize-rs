@@ -13,14 +13,11 @@ serialize-rs = { git = "https://github.com/mutalisk999/serialize-rs.git"}
 ## Example for Serialize/DeSerialize User Define Type (Complex Struct Type)
 
 ```
-#![feature(allocator_api)]
-
 extern crate serialize_rs;
 
 use std::io::{BufRead, Write, BufWriter, Cursor};
 use std::error::Error;
 use serialize_rs::{Serialize, DeSerialize};
-use std::alloc::Global;
 
 #[derive(Debug)]
 struct Xxxx
@@ -41,7 +38,7 @@ impl Xxxx {
 }
 
 impl Serialize for Xxxx {
-    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error, Global>> {
+    fn serialize(&self, w: &mut dyn Write) -> Result<(), Box<dyn Error>> {
         self.a.serialize(w)?;
         self.b.serialize(w)?;
         self.c.serialize(w)?;
@@ -50,7 +47,7 @@ impl Serialize for Xxxx {
 }
 
 impl DeSerialize for Xxxx {
-    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error, Global>> {
+    fn deserialize(&mut self, r: &mut dyn BufRead) -> Result<(), Box<dyn Error>> {
         self.a.deserialize(r)?;
         self.b.deserialize(r)?;
         self.c.deserialize(r)?;
@@ -85,14 +82,11 @@ Xxxx { a: 100, b: "hello world", c: Some(0.123456) }
 or simply
 
 ```
-#![feature(allocator_api)]
-
 extern crate serialize_rs;
 
 use std::io::{BufRead, Write, BufWriter, Cursor};
 use std::error::Error;
 use serialize_rs::{Serialize, DeSerialize, serialize_struct, deserialize_struct};
-use std::alloc::Global;
 
 #[derive(Debug)]
 struct Xxxx
