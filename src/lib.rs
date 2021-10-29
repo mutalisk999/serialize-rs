@@ -633,7 +633,6 @@ macro_rules! deserialize_struct {
 
 #[cfg(test)]
 mod tests {
-    // use crate::is_little_endian;
     use crate::{Serialize, DeSerialize};
     use std::io::{BufWriter, Cursor, Write, BufRead};
     use std::collections::{VecDeque, LinkedList, HashMap, BTreeMap, HashSet, BTreeSet, BinaryHeap};
