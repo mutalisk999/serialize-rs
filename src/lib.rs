@@ -278,9 +278,8 @@ impl DeSerialize for String {
         if length == 0 {
             *self = String::from("");
         } else {
-            let mut buffer: Vec<u8> = Vec::new();
-            // set capacity
-            buffer.reserve(length as usize);
+            // vec new with capacity
+            let mut buffer: Vec<u8> = Vec::with_capacity(length as usize);
             // set size
             buffer.resize(length as usize, 0x0 as u8);
             r.read_exact(&mut buffer)?;
